@@ -5,9 +5,9 @@
 #ifndef UNDERWATERSLAM_SOFTDESCRIPTORREGISTRATION_H
 #define UNDERWATERSLAM_SOFTDESCRIPTORREGISTRATION_H
 
-#include "sofftCorrelationClass.h"
+#include "softCorrelationClass.h"
 #include "PeakFinder.h"
-#include "generalHelpfulTools.h"
+
 //#include "slamToolsRos.h"
 
 #include <pcl/io/pcd_io.h>
@@ -15,7 +15,7 @@
 #include <pcl/common/transforms.h>
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
-//#include <opencv2/highgui.hpp>
+#include <opencv2/highgui.hpp>
 
 #include <CGAL/Simple_cartesian.h>
 #include <CGAL/Min_sphere_of_spheres_d.h>
@@ -29,7 +29,7 @@ struct angleAndCorrelation {
 
 class softDescriptorRegistration {
 public:
-    softDescriptorRegistration(int N, int bwOut, int bwIn, int degLim) : sofftCorrelationObject(N, bwOut, bwIn,
+    softDescriptorRegistration(int N=64, int bwOut=32, int bwIn=32, int degLim=31) : softCorrelationObject(N, bwOut, bwIn,
                                                                                                 degLim) {
         this->N = N;
         this->bwOut = bwOut;
@@ -73,48 +73,17 @@ public:
     }
 
     ~softDescriptorRegistration() {
-        sofftCorrelationObject.~sofftCorrelationClass();
-
-
-//        free(this->resultingCorrelationDouble);
-//        fftw_free(this->resultingCorrelationComplex);
-//        fftw_free(this->resultingPhaseDiff2D );
-//        fftw_free(this->resultingShiftPeaks2D);
-//        fftw_free(this->magnitude1Shifted );
-//        fftw_free(this->magnitude2Shifted );
-//        fftw_free(this->voxelData1 );
-//        fftw_free(this->voxelData2 );
-//        fftw_free(this->spectrumOut );
-//        fftw_free(this->phase1);
-//        fftw_free(this->phase2);
-//        fftw_free(this->magnitude1 );
-//        fftw_free(this->magnitude2 );
-//        fftw_free(resampledMagnitudeSO3_1 );
-//        fftw_free(resampledMagnitudeSO3_2);
-//        fftw_free(resampledMagnitudeSO3_1TMP);
-//        fftw_free(resampledMagnitudeSO3_2TMP );
-//        fftw_free(inputSpacialData);
-//        fftw_destroy_plan(planFourierToVoxel2D);
-//        fftw_destroy_plan(planVoxelToFourier3D);
-//        fftw_destroy_plan(planVoxelToFourier2D);
-
-
+        softCorrelationObject.~softCorrelationClass();
     }
 
     Eigen::Matrix4d registrationOfTwoPCL2D(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData1,
-                                           pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData2, double &fitnessX,
-                                           double &fitnessY, double goodGuessAlpha = -100,
-                                           bool debug = false);//gives TFMatrix from 1 to 2
-
-
-    Eigen::Matrix4d registrationOfTwoPCL2D(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData1,
                                            pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData2,
-                                           double &fitnessX, double &fitnessY,
-                                           Eigen::Matrix4d initialGuessTransformation,
-                                           bool useInitialGuess,
-                                           bool debug);
+                                           Eigen::Matrix4d initialGuess,
+                                           bool useInitialAngle,
+                                           bool useInitialTranslation,
+                                           std::string outputDir,
+                                           bool debug = false);
 
-    //-100 only for "no good guess given"
     //initial guess has to be very good, else dont use it.
     double getSpectrumFromPCL3D(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData, double voxelData[],
                                 double magnitude[], double phase[], double fromTo, int N);
@@ -129,32 +98,30 @@ public:
 
     double movePCLtoMiddle(pcl::PointCloud<pcl::PointXYZ> &pointCloudInputData, Eigen::Matrix4d &transformationPCL);
 
-//    Eigen::Matrix4d
-//    registrationOfTwoVoxel2D(double voxelData1[], double voxelData2[], double &fitnessX, double &fitnessY,
-//                             double goodGuessAlpha, bool debug);
+
 
 
     double
-    sofftRegistrationVoxel2DRotationOnly(double voxelData1Input[], double voxelData2Input[], double goodGuessAlpha,
-                                         bool debug = false);
+    softRegistrationVoxel2DRotationOnly(double voxelData1Input[], double voxelData2Input[], double goodGuessAlpha,
+                                        std::string outputDir,bool debug = false);
 
     std::vector<double>
-    sofftRegistrationVoxel2DListOfPossibleRotations(double voxelData1Input[], double voxelData2Input[],
+    softRegistrationVoxel2DListOfPossibleRotations(double voxelData1Input[], double voxelData2Input[],std::string outputDir,
                                                     bool debug = false);
 
-    Eigen::Vector2d sofftRegistrationVoxel2DTranslation(double voxelData1Input[],
-                                                        double voxelData2Input[],
-                                                        double &fitnessX, double &fitnessY, double cellSize,
+    Eigen::Vector2d softRegistrationVoxel2DTranslation(double voxelData1Input[],
+                                                        double voxelData2Input[], double cellSize,
                                                         Eigen::Vector3d initialGuess, bool useInitialGuess,
                                                         double &heightMaximumPeak, bool debug = false);
 
-    Eigen::Matrix4d registrationOfTwoVoxelsSOFFTFast(double voxelData1Input[],
-                                                     double voxelData2Input[],
-                                                     Eigen::Matrix4d &initialGuess,
-                                                     bool useInitialAngle, bool useInitialTranslation,
-                                                     double cellSize,
-                                                     bool useGauss,
-                                                     bool debug = false);
+    Eigen::Matrix4d registrationOfTwoVoxelsSOFTFast(double voxelData1Input[],
+                                                    double voxelData2Input[],
+                                                    Eigen::Matrix4d initialGuess,
+                                                    bool useInitialAngle,
+                                                    bool useInitialTranslation,
+                                                    double cellSize,
+                                                    std::string outputDir,
+                                                    bool debug = false);
 
 private://here everything is created. malloc is done in the constructor
 
@@ -178,7 +145,7 @@ private://here everything is created. malloc is done in the constructor
     double *resampledMagnitudeSO3_2;
     double *resampledMagnitudeSO3_1TMP;
     double *resampledMagnitudeSO3_2TMP;
-    sofftCorrelationClass sofftCorrelationObject;
+    softCorrelationClass softCorrelationObject;
     fftw_complex *resultingCorrelationComplex;
     fftw_complex *resultingPhaseDiff2D;
     fftw_complex *resultingShiftPeaks2D;

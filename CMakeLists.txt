@@ -33,11 +33,10 @@ set(SOURCE_FILES
         soft20/src/common/utils_so3.c
         soft20/src/common/wignerTransforms.c
 
-        registration/src/scanRegistrationClass.cpp
-        registration/src/sofftCorrelationClass.cpp
+        registration/src/softCorrelationClass.cpp
         registration/src/softDescriptorRegistration.cpp
 
-        tools/src/generalHelpfulTools.cpp
+#        tools/src/generalHelpfulTools.cpp
         tools/src/PeakFinder.cpp
         )
 
@@ -53,3 +52,8 @@ include_directories(
 
 add_executable(fourier_soft2D registrationOfTwoImageScans.cpp ${SOURCE_FILES})
 target_link_libraries(fourier_soft2D fftw3 OpenMP::OpenMP_CXX  ${PCL_LIBRARIES} ${OpenCV_LIBS})
+
+
+add_executable(fourier_soft2D_pcl registrationOfTwoPCLScans.cpp ${SOURCE_FILES})
+target_link_libraries(fourier_soft2D_pcl fftw3 OpenMP::OpenMP_CXX  ${PCL_LIBRARIES} ${OpenCV_LIBS})
+

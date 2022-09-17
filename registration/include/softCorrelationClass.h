@@ -2,8 +2,8 @@
 // Created by tim-linux on 01.03.22.
 //
 
-#ifndef UNDERWATERSLAM_SOFFTCORRELATIONCLASS_H
-#define UNDERWATERSLAM_SOFFTCORRELATIONCLASS_H
+#ifndef UNDERWATERSLAM_SOFTCORRELATIONCLASS_H
+#define UNDERWATERSLAM_SOFTCORRELATIONCLASS_H
 #include "fftw3.h"
 #include "soft20/s2_cospmls.h"
 #include "soft20/s2_semi_memo.h"
@@ -13,12 +13,11 @@
 #include <cmath>
 
 
-
 #define NORM(x) ( (x[0])*(x[0]) + (x[1])*(x[1]) )
 
-class sofftCorrelationClass {
+class softCorrelationClass {
 public:
-    sofftCorrelationClass(int N,int bwOut,int bwIn,int degLim){
+    softCorrelationClass(int N,int bwOut,int bwIn,int degLim){
         this->N = N;
         this->bwOut = bwOut;
         this->bwIn = bwIn;
@@ -130,7 +129,7 @@ public:
 
 
     }
-    ~sofftCorrelationClass (){
+    ~softCorrelationClass (){
 //        free(sigR);
 //        free(sigI);
 //        free(so3Sig);
@@ -179,4 +178,4 @@ private:
 };
 
 
-#endif //UNDERWATERSLAM_SOFFTCORRELATIONCLASS_H
+#endif //UNDERWATERSLAM_SOFTCORRELATIONCLASS_H
