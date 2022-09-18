@@ -31,9 +31,9 @@ int main(int argc, char **argv) {
     int dimensionScan = std::stoi(all_args[3]);
     std::cout << "Voxel size: " << dimensionScan << std::endl;
 
-
+    //scan registration object, because the FFTW3 needs to plan the execution.
     softDescriptorRegistration scanRegistrationObject(dimensionScan, dimensionScan / 2, dimensionScan / 2,
-                                                      dimensionScan / 2 - 1);;
+                                                      dimensionScan / 2 - 1);
 
     pcl::PointCloud<pcl::PointXYZ> scan1;
     pcl::PointCloud<pcl::PointXYZ> scan2;
@@ -52,18 +52,10 @@ int main(int argc, char **argv) {
            0, 1, -0, 0,
             0, 0, 1, -0,
             -0, 0, -0, 1;
-
+    // use initial guess yes/no Currently set to no. Therefore, global registration is happening.
     Eigen::Matrix4d estimatedTransformation = scanRegistrationObject.registrationOfTwoPCL2D(scan1, scan2, initialGuess,
                                                                                             false, false,
                                                                                             outputDir, debug);
-
-
-    cv::Mat trans_mat = (cv::Mat_<double>(2, 3) << estimatedTransformation(0, 0),
-            estimatedTransformation(0, 1),
-            estimatedTransformation(0, 3),
-            estimatedTransformation(1, 0),
-            estimatedTransformation(1, 1),
-            estimatedTransformation(1, 3));
 
 
     std::cout << "Estimated Transformation:" << std::endl;

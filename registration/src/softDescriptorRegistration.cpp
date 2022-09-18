@@ -165,18 +165,18 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoPCL2D(pcl::PointClo
                                                                    bool useInitialTranslation,
                                                                    std::string outputDir,
                                                                    bool debug) {
-    
+
 
     Eigen::Matrix4d transformationPCL1, transformationPCL2;
-    //calc min circle for PCL2
+    //calc min circle for PCLs and move to PCL to the center to not have empty space in Voxel Registration
     double radius1 = this->movePCLtoMiddle(pointCloudInputData1, transformationPCL1);
 
     double radius2 = this->movePCLtoMiddle(pointCloudInputData2, transformationPCL2);
 
     double *voxelData1Input;
     double *voxelData2Input;
-    voxelData1Input = (double *) malloc(sizeof(double) * this->N*this->N);
-    voxelData2Input = (double *) malloc(sizeof(double) * this->N*this->N);
+    voxelData1Input = (double *) malloc(sizeof(double) * this->N * this->N);
+    voxelData2Input = (double *) malloc(sizeof(double) * this->N * this->N);
 
 
     //transforms the point clouds to a different position dependent on minimum circle
@@ -185,13 +185,14 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoPCL2D(pcl::PointClo
     if (radius1 > maxDistance) {
         maxDistance = radius1;
     }
+    //calc cell size for voxel
     double cellSize = std::round(maxDistance * 2.0 * 1.1 / N * 100.0) / 100.0;//make 10% bigger area
 
     this->PCL2Voxel(pointCloudInputData1, voxelData1Input, cellSize * this->N / 2);
     this->PCL2Voxel(pointCloudInputData2, voxelData2Input, cellSize * this->N / 2);
 
 
-
+    //calc Voxel registration
     Eigen::Matrix4d estimatedTransformation = this->registrationOfTwoVoxelsSOFTFast(voxelData1Input,
                                                                                     voxelData2Input,
                                                                                     initialGuess,
@@ -203,7 +204,7 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoPCL2D(pcl::PointClo
     free(voxelData1Input);
     free(voxelData2Input);
 
-
+    // take into account the movement of the PCL in the beginning
     Eigen::Matrix4d finalTransformation =
             transformationPCL2.inverse() * estimatedTransformation.inverse() * transformationPCL1;
     return finalTransformation.inverse();//should be the transformation matrix from 1 to 2
@@ -214,10 +215,11 @@ double
 softDescriptorRegistration::softRegistrationVoxel2DRotationOnly(double voxelData1Input[], double voxelData2Input[],
                                                                 double goodGuessAlpha, std::string outputDir,
                                                                 bool debug) {
+    //calculate all possible rotations
     std::vector<double> allAnglesList = this->softRegistrationVoxel2DListOfPossibleRotations(voxelData1Input,
                                                                                              voxelData2Input, outputDir,
                                                                                              debug);
-
+    //take the closest initial guess
     int indexCorrectAngle = 0;
     for (int i = 1; i < allAnglesList.size(); i++) {
         if (std::abs(angleDifference(allAnglesList[indexCorrectAngle], goodGuessAlpha)) >
@@ -232,7 +234,7 @@ std::vector<double>
 softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(double voxelData1Input[],
                                                                            double voxelData2Input[],
                                                                            std::string outputDir, bool debug) {
-
+    // scan -> spectrum
     double maximumScan1 = this->getSpectrumFromVoxelData2D(voxelData1Input, this->magnitude1,
                                                            this->phase1, false);
     double maximumScan2 = this->getSpectrumFromVoxelData2D(voxelData2Input, this->magnitude2,
@@ -306,7 +308,7 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
         resampledMagnitudeSO3_2TMP[i] = 0;
     }
 
-
+    //resampling from magnitude to sphere of SO(3)
     int r = N / 2 - 2;
     int bandwidth = N / 2;
 
@@ -322,6 +324,7 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
                     255 * magnitude2Shifted[yIndex + N * xIndex];
         }
     }
+    // add CLAHE
     cv::Mat magTMP1(N, N, CV_64FC1, resampledMagnitudeSO3_1TMP);
     cv::Mat magTMP2(N, N, CV_64FC1, resampledMagnitudeSO3_2TMP);
     magTMP1.convertTo(magTMP1, CV_8UC1);
@@ -331,13 +334,11 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
     clahe->apply(magTMP1, magTMP1);
     clahe->apply(magTMP2, magTMP2);
 
-
+    //add CLAHE output data to input data for SO(3) correlation
     for (int j = 0; j < 2 * bandwidth; j++) {
         for (int k = 0; k < 2 * bandwidth; k++) {
-            resampledMagnitudeSO3_1[j + k * bandwidth * 2] = resampledMagnitudeSO3_1[j + k * bandwidth * 2] +
-                                                             ((double) magTMP1.data[j + k * bandwidth * 2]) / 255.0;
-            resampledMagnitudeSO3_2[j + k * bandwidth * 2] = resampledMagnitudeSO3_2[j + k * bandwidth * 2] +
-                                                             ((double) magTMP2.data[j + k * bandwidth * 2]) / 255.0;
+            resampledMagnitudeSO3_1[j + k * bandwidth * 2] = ((double) magTMP1.data[j + k * bandwidth * 2]) / 255.0;
+            resampledMagnitudeSO3_2[j + k * bandwidth * 2] = ((double) magTMP2.data[j + k * bandwidth * 2]) / 255.0;
         }
     }
 
@@ -361,7 +362,7 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
         myFile8.close();
     }
 
-    //use soft descriptor to calculate the correlation
+    //use SOFT descriptor to calculate the correlation
     this->softCorrelationObject.correlationOfTwoSignalsInSO3(resampledMagnitudeSO3_1, resampledMagnitudeSO3_2,
                                                              resultingCorrelationComplex);
 
@@ -374,23 +375,23 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
         for (int i = 0; i < N; i++) {
             currentThetaAngle = j * 2.0 * M_PI / N;
             currentPhiAngle = i * 2.0 * M_PI / N;
-            //[i + N * j]
+
             angleAndCorrelation tmpHolding;
             tmpHolding.correlation = resultingCorrelationComplex[j + N * (i + N * 0)][0]; // real part
             if (tmpHolding.correlation > maxCorrelation) {
                 maxCorrelation = tmpHolding.correlation;
             }
-            // test on dataset with N and N/2 and 0   first test + n/2
+
             tmpHolding.angle = std::fmod(-(currentThetaAngle + currentPhiAngle) + 6 * M_PI, 2 * M_PI);
             correlationOfAngle.push_back(tmpHolding);
         }
     }
-
+    //sort the angle and corresponding correlation height
     std::sort(correlationOfAngle.begin(), correlationOfAngle.end(), compareTwoAngleCorrelation);
 
     std::vector<float> correlationAveraged, angleList;
     double currentAverageAngle = correlationOfAngle[0].angle;
-
+    //calculate average correlation for each angle
     int numberOfAngles = 1;
     double averageCorrelation = correlationOfAngle[0].correlation;
     for (int i = 1; i < correlationOfAngle.size(); i++) {
@@ -409,8 +410,8 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
         }
     }
     correlationAveraged.push_back((float) (averageCorrelation / numberOfAngles));
-
     angleList.push_back((float) currentAverageAngle);
+
     if (debug) {
         std::ofstream myFile9;
         myFile9.open(
@@ -423,7 +424,9 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
         }
         myFile9.close();
     }
-
+    //find peaks:
+    //rotate to lowest position of 1d array
+    //find peaks
     auto minmax = std::min_element(correlationAveraged.begin(), correlationAveraged.end());
     long distanceToMinElement = std::distance(correlationAveraged.begin(), minmax);
     std::rotate(correlationAveraged.begin(), correlationAveraged.begin() + distanceToMinElement,
@@ -432,7 +435,7 @@ softDescriptorRegistration::softRegistrationVoxel2DListOfPossibleRotations(doubl
     std::vector<int> out;
 
     PeakFinder::findPeaks(correlationAveraged, out, true, 4.0);
-
+    // re-rotate
     std::rotate(correlationAveraged.begin(),
                 correlationAveraged.begin() + correlationAveraged.size() - distanceToMinElement,
                 correlationAveraged.end());
@@ -459,7 +462,7 @@ Eigen::Vector2d softDescriptorRegistration::softRegistrationVoxel2DTranslation(d
                                                                                Eigen::Vector3d initialGuess,
                                                                                bool useInitialGuess,
                                                                                double &heightMaximumPeak, bool debug) {
-
+    //scan -> spectrum
     double maximumScan1 = this->getSpectrumFromVoxelData2D(voxelData1Input, this->magnitude1,
                                                            this->phase1, false);
     double maximumScan2 = this->getSpectrumFromVoxelData2D(voxelData2Input, this->magnitude2,
@@ -483,12 +486,12 @@ Eigen::Vector2d softDescriptorRegistration::softRegistrationVoxel2DTranslation(d
         }
     }
 
-
+    //calculate correlation
     fftw_execute(planFourierToVoxel2D);
 
 
 
-    // fftshift and calc magnitude
+    // fftshift and calc magnitude, together with getting highest peak
     int indexMaximumCorrelationI;
     int indexMaximumCorrelationJ;
     double maximumCorrelation = 0;
@@ -511,6 +514,7 @@ Eigen::Vector2d softDescriptorRegistration::softRegistrationVoxel2DTranslation(d
         }
     }
 
+    // if initial guess is used, take initial position and find local maxima of correlation data. Always go the steepest assent
     if (useInitialGuess) {
         //find local maximum in 2d array
         int initialIndexX = (int) (initialGuess[0] / cellSize + N / 2);
@@ -563,10 +567,9 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoVoxelsSOFTFast(doub
     std::vector<Eigen::Matrix4d> listOfTransformations;
     std::vector<double> maximumHeightPeakList;
     std::vector<double> estimatedAngles;
-
+    //calculate array of possible angle registrations. With an initial guess, one is choosen (thereofre list.size =1)
     if (useInitialAngle) {
         double goodGuessAlpha = std::atan2(initialGuess(1, 0), initialGuess(0, 0));
-
         double angleTMP = this->softRegistrationVoxel2DRotationOnly(voxelData1Input, voxelData2Input, goodGuessAlpha,
                                                                     outputDir, debug);
 
@@ -577,9 +580,10 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoVoxelsSOFTFast(doub
                                                                                outputDir, debug);
     }
 
-
+    //calculate translation for each possible angle
     int angleIndex = 0;
     for (double estimatedAngle: estimatedAngles) {
+
 
         //copy data
         for (int i = 0; i < N * N; i++) {
@@ -603,7 +607,7 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoVoxelsSOFTFast(doub
                                                                                maximumPeakOfThisTranslation,
                                                                                debug);
 
-        Eigen::Matrix4d estimatedRotationScans = Eigen::Matrix4d::Identity();//from second scan to first
+        Eigen::Matrix4d estimatedRotationScans = Eigen::Matrix4d::Identity();
         Eigen::AngleAxisd rotation_vectorTMP(estimatedAngle, Eigen::Vector3d(0, 0, 1));
         Eigen::Matrix3d tmpRotMatrix3d = rotation_vectorTMP.toRotationMatrix();
         estimatedRotationScans.block<3, 3>(0, 0) = tmpRotMatrix3d;
@@ -612,6 +616,7 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoVoxelsSOFTFast(doub
         estimatedRotationScans(2, 3) = 0;
         estimatedRotationScans(3, 3) = 1;
 
+        //transformation and peak height of correlation added to list.
         listOfTransformations.push_back(estimatedRotationScans);
         maximumHeightPeakList.push_back(maximumPeakOfThisTranslation);
 
@@ -642,30 +647,29 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoVoxelsSOFTFast(doub
 
 
             warpAffine(magTMP2, magTMP2, trans_mat, magTMP2.size());
-            if (debug) {
-                std::ofstream myFile1, myFile2;
-                myFile1.open(
-                        outputDir + "/resultVoxel1" +
-                        std::to_string(angleIndex) + ".csv");
-                myFile2.open(
-                        outputDir + "/resultVoxel2" +
-                        std::to_string(angleIndex) + ".csv");
-                for (int j = 0; j < this->N; j++) {
-                    for (int i = 0; i < this->N; i++) {
-                        myFile1 << voxelData1[j + this->N * i]; // real part
-                        myFile1 << "\n";
-                        myFile2 << voxelData2[j + this->N * i]; // imaginary part
-                        myFile2 << "\n";
-                    }
+            std::ofstream myFile1, myFile2;
+            myFile1.open(
+                    outputDir + "/resultVoxel1" +
+                    std::to_string(angleIndex) + ".csv");
+            myFile2.open(
+                    outputDir + "/resultVoxel2" +
+                    std::to_string(angleIndex) + ".csv");
+            for (int j = 0; j < this->N; j++) {
+                for (int i = 0; i < this->N; i++) {
+                    myFile1 << voxelData1[j + this->N * i]; // real part
+                    myFile1 << "\n";
+                    myFile2 << voxelData2[j + this->N * i]; // imaginary part
+                    myFile2 << "\n";
                 }
-                myFile1.close();
-                myFile2.close();
             }
+            myFile1.close();
+            myFile2.close();
+
         }
         angleIndex++;
     }
-    //find maximum of maximumPeakOfThisTranslation
 
+    //find maximum of maximumPeakOfThisTranslation
     auto minmax = std::max_element(maximumHeightPeakList.begin(), maximumHeightPeakList.end());
     long distanceToMaxElement = std::distance(maximumHeightPeakList.begin(), minmax);
 
@@ -682,5 +686,5 @@ Eigen::Matrix4d softDescriptorRegistration::registrationOfTwoVoxelsSOFTFast(doub
 
     }
 
-    return listOfTransformations[distanceToMaxElement];//should be the transformation matrix from 1 to 2
+    return listOfTransformations[distanceToMaxElement];//robot transformation matrix from 1 to 2
 }

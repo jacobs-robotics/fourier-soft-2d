@@ -71,6 +71,8 @@ int main(int argc, char **argv) {
 
     softDescriptorRegistration scanRegistrationObject(img1.rows, img1.rows / 2, img1.rows / 2, img1.rows / 2 - 1);
 
+
+    // use initial guess yes/no Currently set to no. Therefore, global registration is happening.
     Eigen::Matrix4d estimatedTransformation = scanRegistrationObject.registrationOfTwoVoxelsSOFTFast(voxelData1,
                                                                                                       voxelData2,
                                                                                                       Eigen::Matrix4d::Identity(),
@@ -79,41 +81,10 @@ int main(int argc, char **argv) {
                                                                                                      outputDir,
                                                                                                      debug);
 
-    cv::Mat trans_mat = (cv::Mat_<double>(2, 3) << estimatedTransformation(0,0),
-            estimatedTransformation(0,1),
-            estimatedTransformation(0, 3),
-            estimatedTransformation(1,0),
-            estimatedTransformation(1,1),
-            estimatedTransformation(1, 3));
 
+    std::cout << "Estimated Transformation:" << std::endl;
 
-
-
-
-
-    cv::Mat magTMP1(dimensionScan, dimensionScan, CV_64F, voxelData1);
-    cv::Mat magTMP2(dimensionScan, dimensionScan, CV_64F, voxelData2);
-    std::cout << "Estimated Transformation(angle + pixel):" << std::endl;
-    std::cout << trans_mat << std::endl;
-    warpAffine(magTMP2, magTMP2, trans_mat, magTMP2.size());
-//            convertMatToDoubleArray(img1, voxelData1);
-//            convertMatToDoubleArray(img2, voxelData2);
-
-    std::ofstream myFile1, myFile2;
-    myFile1.open(outputDir+"/resultVoxel1.csv");
-    myFile2.open(outputDir+"/resultVoxel2.csv");
-    for (int i = 0; i < dimensionScan; i++) {
-        for (int j = 0; j < dimensionScan; j++) {
-            myFile1 << voxelData1[j + dimensionScan * i]; // real part
-            myFile1 << "\n";
-            myFile2 << voxelData2[j + dimensionScan * i]; // imaginary part
-            myFile2 << "\n";
-        }
-    }
-    myFile1.close();
-    myFile2.close();
-
-
+    std::cout << estimatedTransformation << std::endl;
 
     free(voxelData1);
     free(voxelData2);
